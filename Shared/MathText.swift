@@ -2,7 +2,7 @@ import Foundation
 
 enum MathText {
     private static let formulas = try! NSRegularExpression(
-        pattern: #"\\\[([\s\S]*?)\\\]((?:\^(?:\{[^{}]*\}|[A-Za-z0-9+\-]))?)|\\\(([\s\S]*?)\\\)|\$\$([\s\S]*?)\$\$|(?<!\\)\$(?![\s$])([^$\n]+?)(?<!\s)\$"#
+        pattern: #"\\\[([\s\S]*?)(?:\\\]|\](?=\^))((?:\^(?:\{[^{}]*\}|[A-Za-z0-9+\-]))?)|\\\(([\s\S]*?)\\\)|\$\$([\s\S]*?)\$\$|(?<!\\)\$(?![\s$])([^$\n]+?)(?<!\s)\$"#
     )
     private static let fractions = try! NSRegularExpression(pattern: #"\\(?:dfrac|tfrac|frac)\s*\{([^{}]*)\}\s*\{([^{}]*)\}"#)
     private static let roots = try! NSRegularExpression(pattern: #"\\sqrt\s*\{([^{}]*)\}"#)
