@@ -6,6 +6,17 @@ struct ChatChecks {
         precondition(MathText.readable(#"\[a+b]^n"#) == "(a+b)ⁿ")
         precondition(MathText.readable(#"\(x_2 + \frac{a}{b} \leq \sqrt{4}\)"#) == "x₂ + (a)⁄(b) ≤ √(4)")
         precondition(MathText.readable("Costs $5 and $10.") == "Costs $5 and $10.")
+        let large = #"\sqrt[3]{1+\frac{\sqrt{x+1}}{1+\frac{a}{b}}}\qquad\sum_{n=1}^{\infty} a_n"#
+        precondition(MathText.parts("**Решение**\n\\[" + large + "\\]\nГотово") == [
+            .prose("**Решение**\n"), .formula(latex: large, display: true), .prose("\nГотово"),
+        ])
+        let matrix = #"\begin{pmatrix} a & b \\ c & d \end{pmatrix}"#
+        precondition(MathText.parts(matrix) == [.formula(latex: matrix, display: true)])
+        precondition(MathText.parts(#"`\(x\)` и $x_2$."#) == [
+            .prose(#"`\(x\)` и "#), .formula(latex: "x_2", display: false), .prose("."),
+        ])
+        precondition(MathText.parts("```tex\n" + matrix + "\n```").count == 1)
+        precondition(!MathText.readable(#"\[f(-1)>0,\qquad f(b)<0\]"#).contains(#"\qquad"#))
 
         let legacy = Data(#"[{"id":"0A12223A-1222-4222-8222-000000000000","role":"user","content":"Здравствуйте"}]"#.utf8)
         let messages = try JSONDecoder().decode([ChatMessage].self, from: legacy)

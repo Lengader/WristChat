@@ -76,11 +76,11 @@ final class WatchChat: ObservableObject {
                 let reply = try await ResponseStream.answer(model: selected, mode: mode, context: context, token: session.accessToken) { delta in
                     await MainActor.run { self.receiveDelta(delta, for: id) }
                 }
-                self.finish(id: id, text: reply, ending: nil)
+                self.finish(id: id, text: reply, ending: nil, model: selected)
             } catch {
                 guard self.turnID == id else { return }
                 self.error = error.localizedDescription
-                self.finish(id: id, text: self.accumulated, ending: .interrupted)
+                self.finish(id: id, text: self.accumulated, ending: .interrupted, model: self.model)
             }
         }
         return true
@@ -89,7 +89,7 @@ final class WatchChat: ObservableObject {
     func stop() {
         guard let id = turnID else { return }
         request?.cancel()
-        finish(id: id, text: accumulated, ending: .stopped)
+        finish(id: id, text: accumulated, ending: .stopped, model: model)
     }
 
     private func receiveDelta(_ delta: String, for id: UUID) {
@@ -102,9 +102,10 @@ final class WatchChat: ObservableObject {
         }
     }
 
-    private func finish(id: UUID, text: String, ending: ChatMessage.Ending?) {
+    private func finish(id: UUID, text: String, ending: ChatMessage.Ending?, model: String?) {
         guard turnID == id, let thread = replyingTo else { return }
-        book.add([ChatMessage(role: .assistant, content: text, ending: ending)], to: thread)
+        book.add([ChatMessage(role: .assistant, content: text, ending: ending,
+                              model: text.isEmpty ? nil : model)], to: thread)
         turnID = nil
         request = nil
         liveText = ""

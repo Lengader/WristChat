@@ -19,8 +19,11 @@ enum ResponseStream {
         let (data, response) = try await URLSession.shared.data(for: OpenAI.authorized("/models", token: token))
         try OpenAI.check(response)
         let catalog = try JSONDecoder().decode(Catalog.self, from: data)
-        guard let first = catalog.models.first(where: { $0.visibility == "list" }) else { throw WristError.noModels }
-        return first.slug
+        let available = catalog.models.filter { $0.visibility == "list" }
+        guard let selected = available.first(where: { $0.slug == "gpt-6.2-sol" }) ?? available.first else {
+            throw WristError.noModels
+        }
+        return selected.slug
     }
 
     static func answer(model: String, mode: ReasoningMode, context: [ChatMessage], token: String,
@@ -43,7 +46,7 @@ enum ResponseStream {
         }
         var body: [String: Any] = [
             "model": model, "store": false, "stream": true, "input": input,
-            "instructions": "Reply concisely in the user's language. The answer will be read on an Apple Watch. Delimit LaTeX formulas clearly, and prefer standard LaTeX commands.",
+            "instructions": #"Reply concisely in the user's language. Use \(...\) for inline math and \[...\] for display math. Break wide multi-step equations into aligned rows where appropriate for the Apple Watch screen."#,
         ]
         if let effort = mode.effort { body["reasoning"] = ["effort": effort] }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

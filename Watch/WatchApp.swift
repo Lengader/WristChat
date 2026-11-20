@@ -189,6 +189,9 @@ private struct WatchThread: View {
                     Label("Прочитать", systemImage: "speaker.wave.2").font(.caption2)
                 }
                 .buttonStyle(.borderless)
+                if let model = message.modelTitle {
+                    Text(model).font(.caption2).foregroundStyle(.secondary)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: own ? .trailing : .leading)

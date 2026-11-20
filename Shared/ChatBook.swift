@@ -31,6 +31,9 @@ struct ChatMessage: Identifiable, Codable {
     var content: String
     var photo: Data?
     var ending: Ending?
+    var model: String?
+
+    var modelTitle: String? { model == "gpt-6.2-sol" ? "GPT‑6.2 Sol" : model }
 }
 
 struct ChatThread: Identifiable, Codable {

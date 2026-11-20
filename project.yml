@@ -5,16 +5,25 @@ options:
     watchOS: "11.0"
 settings:
   base:
-    MARKETING_VERSION: "0.3.0"
-    CURRENT_PROJECT_VERSION: "3"
+    MARKETING_VERSION: "0.4.0"
+    CURRENT_PROJECT_VERSION: "4"
     SWIFT_VERSION: "5.0"
     GENERATE_INFOPLIST_FILE: YES
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+packages:
+  SwaTex:
+    url: https://github.com/PhraseHQ/SwaTex.git
+    exactVersion: "0.6.0"
 targets:
   WristChat:
     type: application
     platform: iOS
     sources: [Phone, Shared]
+    dependencies:
+      - package: SwaTex
+        product: SwaTex
+      - package: SwaTex
+        product: SwaTexRender
     info:
       path: build/PhoneInfo.plist
       properties:
@@ -28,6 +37,11 @@ targets:
     type: application
     platform: watchOS
     sources: [Watch, Shared]
+    dependencies:
+      - package: SwaTex
+        product: SwaTex
+      - package: SwaTex
+        product: SwaTexRender
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: dev.wristchat.personal.watchkitapp
       INFOPLIST_KEY_CFBundleDisplayName: WristChat

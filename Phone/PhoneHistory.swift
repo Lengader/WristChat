@@ -69,7 +69,7 @@ private struct PhoneThread: View {
             Section {
                 ForEach(thread?.messages ?? []) { message in
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(message.role == .user ? "Ты" : "ChatGPT")
+                        Text(message.role == .user ? "Ты" : (message.modelTitle ?? "ChatGPT"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         MessageBody(message: message).textSelection(.enabled)

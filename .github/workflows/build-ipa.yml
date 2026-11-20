@@ -3,6 +3,7 @@ name: Build test IPA
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -29,10 +30,10 @@ jobs:
           set -euo pipefail
           xcodebuild -project WristChat.xcodeproj -scheme WristChat \
             -configuration Release -destination 'generic/platform=iOS' \
-            -derivedDataPath build/phone CODE_SIGNING_ALLOWED=NO build
+            -derivedDataPath build/phone -clonedSourcePackagesDirPath build/packages CODE_SIGNING_ALLOWED=NO build
           xcodebuild -project WristChat.xcodeproj -scheme WristChatWatch \
             -configuration Release -destination 'generic/platform=watchOS' \
-            -derivedDataPath build/watch CODE_SIGNING_ALLOWED=NO build
+            -derivedDataPath build/watch -clonedSourcePackagesDirPath build/packages CODE_SIGNING_ALLOWED=NO build
 
           mkdir -p build/package/Payload
           phone='build/package/Payload/WristChat.app'
@@ -48,10 +49,49 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :WKApplication' "$watch/Info.plist")" = true
           test -x "$phone/WristChat"
           test -x "$watch/WristChatWatch"
+          for app in "$phone" "$watch"; do
+            test -d "$app/SwaTex_SwaTexRender.bundle/Fonts"
+            if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+              version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Info.plist")
+              test "v$version" = "$GITHUB_REF_NAME"
+            fi
+          done
           ditto -c -k --keepParent build/package/Payload build/WristChat-unsigned.ipa
           unzip -tq build/WristChat-unsigned.ipa
+      - name: Check native LaTeX layout for nested expressions
+        run: |
+          set -euo pipefail
+          printf '%s\n' \
+            '\sqrt[3]{1+\frac{\sqrt{x+1}}{1+\frac{a}{b}}}' \
+            'f(-1)=1+b^2+k(b-1)>0,\qquad f(b)=2b^2-k(b^2+1)<0' \
+            '\begin{aligned} a^2+b^2 &= k(ab+1) \\ k &= \frac{a^2+b^2}{ab+1}\end{aligned}' \
+            '\begin{pmatrix} a & b \\ c & d \end{pmatrix}' \
+            | swift run --package-path build/packages/checkouts/SwaTex --scratch-path build/math-layout LayoutDump \
+            | jq -es 'length == 4 and all(.[]; (.displayList.itemCount // 0) > 5 and .displayList.height > 0 and .displayList.depth > 0)'
       - uses: actions/upload-artifact@v4
         with:
           name: WristChat-unsigned
           path: build/WristChat-unsigned.ipa
           if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: WristChat-unsigned
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=${GITHUB_REF_NAME#v}
+          asset="WristChat-$version-unsigned.ipa"
+          mv WristChat-unsigned.ipa "$asset"
+          gh release create "$GITHUB_REF_NAME" "$asset" --repo "$GITHUB_REPOSITORY" \
+            --verify-tag --title "WristChat $version" --generate-notes \
+            --notes 'В релизе находится неподписанный IPA для iPhone и Apple Watch. Подпиши и установи его через WatchBridge.'
