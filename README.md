@@ -1,10 +1,16 @@
-<img align="right" width="100" alt="Иконка WristChat" src="Shared/Assets.xcassets/AppIcon.appiconset/WristChat.png">
-
-# WristChat
+# ![WristChat — ChatGPT на запястье](docs/images/wristchat-cover.png)
 
 **ChatGPT на Apple Watch.** Задавай вопросы с запястья, набирай текст или диктуй голосом. Ответ появляется прямо в чате, его можно прочитать или послушать. iPhone нужен для первого входа и просмотра той же переписки.
 
 **[Скачать последнюю сборку](https://github.com/Lengader/WristChat/releases/latest)** · [Все версии](https://github.com/Lengader/WristChat/releases)
+
+## Как выглядит
+
+| Apple Watch | iPhone |
+| --- | --- |
+| ![Чат на Apple Watch, текст появляется по мере генерации и доступна кнопка «Стоп»](docs/images/watch-stream.png) | ![История чата на iPhone с вложенным корнем и настройкой «Думать дольше»](docs/images/iphone-chat.png) |
+
+*Скриншоты интерактивного макета с демонстрационными сообщениями.*
 
 ## Что умеет
 
