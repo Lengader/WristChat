@@ -31,10 +31,10 @@ jobs:
 
           mkdir -p build/package/Payload
           phone='build/package/Payload/WristChat.app'
-          watch="$phone/PlugIns/WristChatWatch.app"
+          watch="$phone/Watch/WristChatWatch.app"
           ditto build/phone/Build/Products/Release-iphoneos/WristChat.app "$phone"
-          # Xcode 26 treats the single-target Watch app as a Foundation extension.
-          mkdir -p "$phone/PlugIns"
+          # iLoader Watch Companion discovers watchOS apps in this directory.
+          mkdir -p "$phone/Watch"
           ditto build/watch/Build/Products/Release-watchos/WristChatWatch.app "$watch"
 
           phone_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$phone/Info.plist")
