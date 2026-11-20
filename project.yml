@@ -5,15 +5,20 @@ options:
     watchOS: "11.0"
 settings:
   base:
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.2.0"
+    CURRENT_PROJECT_VERSION: "2"
     SWIFT_VERSION: "5.0"
     GENERATE_INFOPLIST_FILE: YES
 targets:
   WristChat:
     type: application
     platform: iOS
-    sources: [Phone]
+    sources: [Phone, Shared]
+    info:
+      path: build/PhoneInfo.plist
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLSchemes: [wristchat-auth]
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: dev.wristchat.personal
       TARGETED_DEVICE_FAMILY: "1"
@@ -21,7 +26,7 @@ targets:
   WristChatWatch:
     type: application
     platform: watchOS
-    sources: [Watch]
+    sources: [Watch, Shared]
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: dev.wristchat.personal.watchkitapp
       INFOPLIST_KEY_CFBundleDisplayName: WristChat
