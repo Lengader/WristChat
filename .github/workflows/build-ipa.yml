@@ -1,0 +1,52 @@
+name: Build test IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Generate Xcode project
+        run: |
+          xcodebuild -version
+          brew install xcodegen
+          xcodegen generate
+      - name: Build and package device apps
+        run: |
+          set -euo pipefail
+          xcodebuild -project WristChat.xcodeproj -scheme WristChat \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -derivedDataPath build/phone CODE_SIGNING_ALLOWED=NO build
+          xcodebuild -project WristChat.xcodeproj -scheme WristChatWatch \
+            -configuration Release -destination 'generic/platform=watchOS' \
+            -derivedDataPath build/watch CODE_SIGNING_ALLOWED=NO build
+
+          mkdir -p build/package/Payload
+          phone='build/package/Payload/WristChat.app'
+          watch="$phone/PlugIns/WristChatWatch.app"
+          ditto build/phone/Build/Products/Release-iphoneos/WristChat.app "$phone"
+          # Xcode 26 treats the single-target Watch app as a Foundation extension.
+          mkdir -p "$phone/PlugIns"
+          ditto build/watch/Build/Products/Release-watchos/WristChatWatch.app "$watch"
+
+          phone_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$phone/Info.plist")
+          watch_companion=$(/usr/libexec/PlistBuddy -c 'Print :WKCompanionAppBundleIdentifier' "$watch/Info.plist")
+          test "$phone_id" = "$watch_companion"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :WKApplication' "$watch/Info.plist")" = true
+          test -x "$phone/WristChat"
+          test -x "$watch/WristChatWatch"
+          ditto -c -k --keepParent build/package/Payload build/WristChat-unsigned.ipa
+          unzip -tq build/WristChat-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WristChat-unsigned
+          path: build/WristChat-unsigned.ipa
+          if-no-files-found: error
