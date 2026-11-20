@@ -12,7 +12,8 @@ struct ChatSession: Codable {
 }
 
 enum WristError: LocalizedError {
-    case invalidResponse, invalidIdentity, permissionDenied, noModels, callbackUnavailable
+    case invalidResponse, invalidIdentity, permissionDenied, noModels, callbackUnavailable, unreadablePhoto
+    case reasoningUnavailable, photoUnavailable
     case keychain(OSStatus)
     case service(Int)
 
@@ -23,6 +24,9 @@ enum WristError: LocalizedError {
         case .permissionDenied: "Аккаунт не дал разрешение использовать подписку ChatGPT."
         case .noModels: "Для этого аккаунта нет доступных моделей ChatGPT."
         case .callbackUnavailable: "Не удалось открыть локальный вход. Попробуй ещё раз."
+        case .unreadablePhoto: "Не удалось загрузить фото на часах. Выбери другое."
+        case .reasoningUnavailable: "Текущая модель не поддерживает этот режим. Выбери «Авто»."
+        case .photoUnavailable: "Текущая модель не приняла фото. Попробуй другой снимок или отправь текст."
         case .keychain: "Не удалось сохранить подключение в Связке ключей."
         case .service(401): "Подключение истекло. Войди в WristChat на iPhone ещё раз."
         case .service(403): "OpenAI не разрешил запрос для этого аккаунта или региона."
@@ -70,14 +74,56 @@ enum SecretStore {
 final class CompanionLink: NSObject, WCSessionDelegate {
     static let credentialKey = "chat-session"
     static let acknowledgmentKey = "chat-session-received"
+    private static let historyKey = "wristchat-history"
+    private static let reasoningKey = "wristchat-reasoning"
 
     let session = WCSession.default
     var onContext: (([String: Any]) -> Void)?
     var onActivation: (() -> Void)?
+    var onHistory: ((Data) -> Void)?
+    var onHistorySent: ((Error?) -> Void)?
+    var onReasoningChange: ((Data) -> Void)?
 
     func start() {
         session.delegate = self
         session.activate()
+    }
+
+    func sendHistory(_ snapshot: HistorySnapshot) throws -> Bool {
+        guard session.activationState == .activated else { return false }
+        #if os(watchOS)
+        guard session.isCompanionAppInstalled else { return false }
+        #endif
+        guard !session.outstandingFileTransfers.contains(where: { $0.file.metadata?[Self.historyKey] as? Bool == true }) else {
+            return false
+        }
+        let url = FileManager.default.temporaryDirectory.appending(path: "wristchat-\(UUID().uuidString).json")
+        try JSONEncoder().encode(snapshot).write(to: url, options: .atomic)
+        session.transferFile(url, metadata: [Self.historyKey: true])
+        return true
+    }
+
+    func sendReasoningChange(_ change: ReasoningChange) throws {
+        guard session.activationState == .activated else { return }
+        session.transferUserInfo([Self.reasoningKey: try JSONEncoder().encode(change)])
+    }
+
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        guard let data = userInfo[Self.reasoningKey] as? Data else { return }
+        DispatchQueue.main.async { self.onReasoningChange?(data) }
+    }
+
+    func session(_ session: WCSession, didReceive file: WCSessionFile) {
+        guard file.metadata?[Self.historyKey] as? Bool == true,
+              let data = try? Data(contentsOf: file.fileURL) else { return }
+        DispatchQueue.main.async { self.onHistory?(data) }
+    }
+
+    func session(_ session: WCSession, didFinish fileTransfer: WCSessionFileTransfer, error: Error?) {
+        let file = fileTransfer.file
+        guard file.metadata?[Self.historyKey] as? Bool == true else { return }
+        try? FileManager.default.removeItem(at: file.fileURL)
+        DispatchQueue.main.async { self.onHistorySent?(error) }
     }
 
     func session(_ session: WCSession, activationDidCompleteWith state: WCSessionActivationState, error: Error?) {

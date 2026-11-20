@@ -19,6 +19,11 @@ jobs:
           xcodebuild -version
           brew install xcodegen
           xcodegen generate
+      - name: Check history, reasoning preferences, and math display
+        run: |
+          mkdir -p build
+          swiftc Shared/ChatBook.swift Shared/MathText.swift Checks/ChatChecks.swift -o build/chat-checks
+          build/chat-checks
       - name: Build and package device apps
         run: |
           set -euo pipefail

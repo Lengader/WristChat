@@ -6,26 +6,7 @@ struct WristChatPhoneApp: App {
     @StateObject private var signIn = PhoneSignIn()
 
     var body: some Scene {
-        WindowGroup {
-            VStack(alignment: .leading, spacing: 18) {
-                Label("WristChat", systemImage: "applewatch").font(.largeTitle.bold())
-                Text("Подключи подписку ChatGPT для ответов на Apple Watch.")
-                    .foregroundStyle(.secondary)
-                Button("Continue with ChatGPT") { signIn.begin() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.primary)
-                    .disabled(signIn.busy || !signIn.watchReady)
-                if signIn.busy { ProgressView() }
-                if let status = signIn.status {
-                    Text(status).font(.footnote).foregroundStyle(.secondary)
-                } else if !signIn.watchReady {
-                    Text("Установи WristChat на Apple Watch и открой его.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-            .padding(24)
-        }
+        WindowGroup { PhoneHistory(account: signIn) }
     }
 }
 
@@ -47,6 +28,8 @@ final class PhoneSignIn: NSObject, ObservableObject, ASWebAuthenticationPresenta
     @Published private(set) var busy = false
     @Published private(set) var watchReady = false
     @Published private(set) var status: String?
+    @Published private(set) var history = ChatBook()
+    @Published private(set) var historySubject: String?
 
     private let link = CompanionLink()
     private var listener: OAuthLoopback?
@@ -55,8 +38,12 @@ final class PhoneSignIn: NSObject, ObservableObject, ASWebAuthenticationPresenta
 
     override init() {
         super.init()
+        if let previous = try? SecretStore.load(Registration.self, key: "chat-registration") {
+            loadHistory(for: previous.subject)
+        }
         link.onActivation = { [weak self] in self?.updateWatchStatus() }
         link.onContext = { [weak self] in self?.acknowledge($0) }
+        link.onHistory = { [weak self] data in self?.receiveHistory(data) }
         link.start()
     }
 
@@ -145,6 +132,7 @@ final class PhoneSignIn: NSObject, ObservableObject, ASWebAuthenticationPresenta
                                       accessToken: tokens.accessToken, refreshToken: renewable,
                                       expiration: Date().addingTimeInterval(tokens.expiresIn))
             try SecretStore.save(Registration(clientID: clientID, subject: subject), key: "chat-registration")
+            if historySubject != subject { loadHistory(for: subject) }
             try link.session.updateApplicationContext([CompanionLink.credentialKey: JSONEncoder().encode(session)])
             status = "Вход выполнен. Открой WristChat на Apple Watch."
         } catch { status = error.localizedDescription }
@@ -163,6 +151,35 @@ final class PhoneSignIn: NSObject, ObservableObject, ASWebAuthenticationPresenta
 
     private func updateWatchStatus() {
         watchReady = link.session.activationState == .activated && link.session.isPaired && link.session.isWatchAppInstalled
+        if watchReady {
+            for change in history.changes.values { try? link.sendReasoningChange(change) }
+        }
+    }
+
+    func setMode(_ mode: ReasoningMode?, for thread: UUID?) {
+        guard let subject = historySubject else { return }
+        let change = ReasoningChange(subject: subject, threadID: thread, mode: mode)
+        history.apply(change)
+        do {
+            try ChatStorage.save(history, for: subject)
+            try link.sendReasoningChange(change)
+        } catch { status = "Не удалось сохранить настройку режима." }
+    }
+
+    private func loadHistory(for subject: String) {
+        historySubject = subject
+        history = ChatStorage.load(subject)
+    }
+
+    private func receiveHistory(_ data: Data) {
+        guard let snapshot = try? JSONDecoder().decode(HistorySnapshot.self, from: data),
+              snapshot.subject == historySubject, snapshot.book.revision >= history.revision else { return }
+        var merged = snapshot.book
+        for change in history.changes.values { merged.apply(change) }
+        history = merged
+        do {
+            try ChatStorage.save(merged, for: snapshot.subject)
+        } catch { status = "Не удалось сохранить историю на iPhone." }
     }
 
     private func fail(_ error: Error, state: String) {
